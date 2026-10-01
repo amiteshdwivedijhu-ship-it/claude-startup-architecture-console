@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Startup Architecture Console · Anthropic Startups (synthetic prototype)</title>
+<meta name="description" content="Unofficial synthetic prototype of a Startups Applied AI Architecture Console for Anthropic: founder discovery, a Claude architecture packet (Messages API, tool use, prompt caching, context engineering), a first-deploy checklist, a cited use-case eval, human gates (Ship first agent path, Tighten tool permissions, Need evals, Send feedback), and a Product / research feedback strip. No live Claude API, no accounts, no Console sign-in.">
+<style>
+  :root {
+    --canvas: #f0eee6;
+    --card: #faf9f5;
+    --oat: #e3dacc;
+    --ink: #141413;
+    --slate: #3d3d3a;
+    --muted: #87867f;
+    --muted-2: #b0aea5;
+    --line: #ddd8cb;
+    --line-2: #cbc5b4;
+    --clay: #d97757;
+    --clay-deep: #c6613f;
+    --coral: #cc785c;
+    --coral-deep: #b5634a;
+    --coral-soft: rgba(204, 120, 92, .12);
+    --sage: #5f7f62;
+    --sage-soft: rgba(95, 127, 98, .12);
+    --amber: #9a6b2f;
+    --amber-soft: rgba(154, 107, 47, .12);
+    --radius: 14px;
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { margin: 0; background: var(--canvas); color: var(--ink); }
+  body { font-family: var(--font); font-size: 15px; line-height: 1.5; }
+  code, .mono { font-family: var(--mono); }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+  /* ---------- topbar ---------- */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+  }
+  .mark { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .mark svg { flex: none; }
+  .mark-name { font-weight: 800; font-size: 13.5px; letter-spacing: .01em; white-space: nowrap; }
+  .mark-name small { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 800; color: var(--slate);
+    background: var(--card); border: 1px solid var(--line-2);
+    white-space: nowrap; min-height: 28px;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-2); }
+  .pill.ready { color: var(--sage); border-color: rgba(95,127,98,.45); background: var(--sage-soft); }
+  .pill.ready .dot { background: var(--sage); }
+  .pill.blocked { color: var(--clay-deep); border-color: rgba(198,97,63,.45); background: var(--coral-soft); }
+  .pill.blocked .dot { background: var(--clay); }
+  .pill.running { color: var(--amber); border-color: rgba(154,107,47,.45); background: var(--amber-soft); }
+  .pill.running .dot { background: var(--amber); }
+
+  /* ---------- walkthrough bar ---------- */
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 14px 28px; }
+  .walk {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 14px 0 0; padding: 12px 14px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .walk-label { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 800; }
+  .steps { display: flex; gap: 5px; align-items: center; }
+  .step-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11px; font-weight: 800;
+    color: var(--muted-2); background: var(--oat);
+    border: 1px solid var(--line-2);
+  }
+  .step-dot.past { background: var(--clay); border-color: var(--clay); color: #fff; }
+  .step-dot.now { background: var(--clay); border-color: var(--clay); color: #fff; box-shadow: 0 0 0 3px rgba(217,119,87,.22); }
+  .caption { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; color: var(--slate); font-size: 13px; font-weight: 500; }
+  .caption b { color: var(--clay-deep); font-weight: 800; }
+
+  /* ---------- hero ---------- */
+  .hero { margin: 14px 0 0; padding: 18px 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+  .hero h1 { margin: 0; font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: .01em; line-height: 1.2; }
+  .hero h1 .clay { color: var(--clay-deep); }
+  .hero p { margin: 7px 0 0; font-size: 13.5px; color: var(--slate); line-height: 1.5; max-width: 62ch; }
+  .hero .flow { margin: 9px 0 0; font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+
+  /* ---------- cards ---------- */
+  .card { margin: 12px 0 0; padding: 16px 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+  .card h2 { margin: 0 0 2px; font-family: var(--serif); font-size: 17.5px; font-weight: 700; letter-spacing: .01em; }
+  .card .sub { margin: 0; font-size: 12.5px; color: var(--muted); }
+  .section-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+  .section-head .kicker { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--clay-deep); font-weight: 800; margin: 2px 0 0; }
+  .section-head .right { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 700; color: var(--slate);
+    background: var(--card); border: 1px solid var(--line-2);
+    white-space: nowrap; min-height: 26px;
+  }
+  .chip.clay { color: var(--clay-deep); background: var(--coral-soft); border-color: rgba(198,97,63,.4); }
+  .chip.sage { color: var(--sage); background: var(--sage-soft); border-color: rgba(95,127,98,.4); }
+  .chip .mono { font-size: 10.5px; }
+
+  /* ---------- discovery ---------- */
+  .founder { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; flex-wrap: wrap; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex: none;
+    background: var(--oat); border: 1px solid var(--line-2);
+    display: grid; place-items: center;
+    font-family: var(--serif); font-size: 17px; font-weight: 700; color: var(--clay-deep);
+  }
+  .founder-info { min-width: 0; flex: 1 1 200px; }
+  .founder-info .name { font-weight: 800; font-size: 14.5px; }
+  .founder-info .name .tag { font-size: 10px; font-weight: 800; color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; letter-spacing: .04em; }
+  .founder-info .role { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+  .goal-box { margin-top: 12px; padding: 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; }
+  .goal-box .goal-label { font-size: 10px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 800; }
+  .goal-box .goal { margin: 4px 0 0; font-size: 14px; line-height: 1.5; }
+  .goal-box .goal b { color: var(--clay-deep); }
+  .chip-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* ---------- architecture ---------- */
+  .arch-reco { margin-top: 12px; padding: 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; font-size: 13.5px; line-height: 1.55; }
+  .arch-reco b { color: var(--clay-deep); }
+  .code-strip {
+    margin-top: 12px; border-radius: 10px; overflow: hidden;
+    background: var(--ink); border: 1px solid #2c2b28;
+  }
+  .code-strip .code-head {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; background: #1d1c19; border-bottom: 1px solid #2c2b28;
+  }
+  .code-strip .code-head span { font-size: 10.5px; color: var(--muted-2); font-weight: 700; letter-spacing: .04em; }
+  .code-strip .code-head .mono { color: #d8d3c8; font-size: 10.5px; }
+  .code-strip pre {
+    margin: 0; padding: 12px; overflow-x: auto;
+    font-family: var(--mono); font-size: 11px; line-height: 1.6; color: #e8e4da;
+    -webkit-overflow-scrolling: touch;
+  }
+  .code-strip pre .k { color: #e09a7f; }
+  .code-strip pre .s { color: #c9c3b4; }
+  .code-strip pre .c { color: #7d7a70; }
+  .arch-list { margin-top: 12px; display: grid; gap: 8px; }
+  .arch-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 11px 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .arch-item .n {
+    flex: none; width: 22px; height: 22px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 800; color: #fff; background: var(--clay);
+  }
+  .arch-item .body { min-width: 0; }
+  .arch-item .t { font-weight: 800; font-size: 13.5px; }
+  .arch-item .t .mono { font-size: 12px; color: var(--clay-deep); }
+  .arch-item .d { font-size: 12.5px; color: var(--slate); margin-top: 2px; line-height: 1.5; }
+  .cites { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: 1px; }
+  .cite {
+    display: inline-grid; place-items: center;
+    min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 5px; font-size: 10px; font-weight: 800;
+    color: var(--clay-deep); background: var(--coral-soft);
+    border: 1px solid rgba(198,97,63,.35);
+    text-decoration: none; font-family: var(--mono);
+  }
+  .cite:hover { background: var(--clay); color: #fff; }
+
+  /* ---------- checklist ---------- */
+  .check-list { margin-top: 12px; display: grid; gap: 0; }
+  .check-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 2px; border-bottom: 1px solid var(--line);
+  }
+  .check-item:last-child { border-bottom: none; }
+  .check-item .box {
+    flex: none; width: 22px; height: 22px; margin-top: 1px;
+    border-radius: 6px; border: 1.5px solid var(--line-2);
+    display: grid; place-items: center;
+    font-size: 12px; color: transparent; background: var(--card);
+  }
+  .check-item.done .box { background: var(--sage); border-color: var(--sage); color: #fff; }
+  .check-item .txt { min-width: 0; font-size: 13px; line-height: 1.45; }
+  .check-item .txt .mono { font-size: 12px; }
+  .check-item .txt small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+  .check-item.done .txt { color: var(--slate); }
+  .check-item.open .txt { color: var(--ink); font-weight: 600; }
+  .check-status { margin-top: 10px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+
+  /* ---------- eval ---------- */
+  .eval-set { margin-top: 12px; padding: 10px 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; color: var(--slate); }
+  .eval-set b { color: var(--ink); }
+  .findings { margin-top: 10px; display: grid; gap: 8px; }
+  .finding {
+    padding: 11px 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px;
+  }
+  .finding .head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .finding .metric { font-weight: 800; font-size: 13.5px; }
+  .finding .detail { font-size: 12.5px; color: var(--slate); margin-top: 3px; line-height: 1.5; }
+  .pass-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .03em;
+  }
+  .pass-chip.pass { color: var(--sage); background: var(--sage-soft); border: 1px solid rgba(95,127,98,.4); }
+  .pass-chip.fail { color: var(--clay-deep); background: var(--coral-soft); border: 1px solid rgba(198,97,63,.4); }
+  .verdict { margin-top: 10px; padding: 11px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; font-weight: 600; }
+  .verdict.win { background: var(--sage-soft); border: 1px solid rgba(95,127,98,.4); color: var(--sage); }
+  .verdict.blocked { background: var(--coral-soft); border: 1px solid rgba(198,97,63,.4); color: var(--clay-deep); }
+  .verdict.neutral { background: var(--canvas); border: 1px solid var(--line-2); color: var(--slate); }
+  .honest { margin-top: 8px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- gates ---------- */
+  .gate-note { margin: 10px 0 0; font-size: 12.5px; color: var(--slate); }
+  .gates { display: grid; gap: 8px; margin-top: 10px; }
+  .gates button {
+    min-height: 46px; padding: 11px 14px; border-radius: 10px;
+    font-weight: 800; font-size: 14px; text-align: left;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .gates button .g-arrow { margin-left: auto; font-size: 15px; }
+  .gates button.primary { color: #fff; background: var(--coral); border: none; }
+  .gates button.primary:hover { background: var(--coral-deep); }
+  .gates button.primary:disabled { background: var(--muted-2); color: #f5f3ec; cursor: default; }
+  .gates button.outline { color: var(--clay-deep); background: var(--card); border: 1.5px solid var(--clay); }
+  .gates button.outline:hover { background: var(--coral-soft); }
+  .gates button.outline:disabled { color: var(--muted-2); border-color: var(--line-2); background: var(--card); cursor: default; }
+  .gates button.ghost { color: var(--slate); background: var(--card); border: 1px solid var(--line-2); }
+  .gates button.ghost:hover { border-color: var(--clay); color: var(--clay-deep); }
+  .gates button.ghost:disabled { color: var(--muted-2); border-color: var(--line); cursor: default; }
+  .gates button .g-sub { display: block; font-size: 11px; font-weight: 600; opacity: .8; margin-top: 1px; }
+
+  /* ---------- blocked panel ---------- */
+  .blocked {
+    margin-top: 10px; padding: 12px; border-radius: 10px;
+    background: var(--coral-soft); border: 1px solid rgba(198,97,63,.45);
+  }
+  .blocked .b-title { font-weight: 800; font-size: 13px; color: var(--clay-deep); }
+  .blocked .b-reason { font-size: 12.5px; color: var(--slate); margin-top: 3px; line-height: 1.5; }
+  .blocked .b-missing { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--slate); }
+  .blocked .b-missing li { margin-top: 3px; }
+  .blocked .b-missing .mono { font-size: 11.5px; }
+
+  /* ---------- feedback strip ---------- */
+  .fb-note { margin-top: 12px; padding: 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; line-height: 1.55; }
+  .fb-note b { color: var(--clay-deep); }
+  .fb-status { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+  .fb-status .sent { color: var(--sage); font-weight: 800; }
+  .fb-status .unsent { color: var(--muted); }
+
+  /* ---------- footer ---------- */
+  .footer { margin-top: 16px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+  .footer a { color: var(--clay-deep); }
+  .reset {
+    margin-top: 12px; background: none; border: none; padding: 8px 4px;
+    color: var(--muted); font-size: 12px; font-weight: 700; text-decoration: underline;
+  }
+  .reset:hover { color: var(--clay-deep); }
+
+  /* ---------- desktop ---------- */
+  @media (min-width: 720px) {
+    .wrap { padding: 0 20px 36px; }
+    .hero h1 { font-size: 27px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+    .pair .card { margin-top: 12px; }
+    .caption { flex: 1 1 auto; }
+    .gates { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="mark">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+      <circle cx="13" cy="13" r="13" fill="#d97757"/>
+      <g stroke="#faf9f5" stroke-width="2.1" stroke-linecap="round">
+        <line x1="13" y1="4.6" x2="13" y2="21.4"/>
+        <line x1="4.6" y1="13" x2="21.4" y2="13"/>
+        <line x1="7.1" y1="7.1" x2="18.9" y2="18.9"/>
+        <line x1="18.9" y1="7.1" x2="7.1" y2="18.9"/>
+      </g>
+    </svg>
+    <div class="mark-name">Startups · Applied AI<small> · Claude Developer Platform</small></div>
+  </div>
+  <div class="topbar-right">
+    <span class="pill" id="statusPill"><span class="dot"></span><span id="statusText">Architecture ready</span></span>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="walk">
+    <span class="walk-label">Session</span>
+    <div class="steps" id="steps">
+      <span class="step-dot past" title="Discovery">1</span>
+      <span class="step-dot now" title="Architecture">2</span>
+      <span class="step-dot" title="First deploy">3</span>
+      <span class="step-dot" title="Eval">4</span>
+      <span class="step-dot" title="Feedback">5</span>
+    </div>
+    <div class="caption" id="caption">Discovery done. Architecture packet ready. Pick a gate to move the first useful agent forward.</div>
+  </div>
+
+  <div class="hero">
+    <h1>Claude Startup Architecture Console <span class="clay">· Kitepath</span></h1>
+    <p>Working session for an Applied AI Architect and a founder: discovery, a Claude architecture packet, a first useful agent path, a use-case eval to win the technical evaluation, and one line of feedback for Product / research.</p>
+    <div class="flow">discovery → architecture → first useful agent → eval → feedback</div>
+  </div>
+
+  <!-- 1 · DISCOVERY -->
+  <div class="card">
+    <div class="section-head">
+      <div>
+        <div class="kicker">1 · Discovery</div>
+        <h2>Founder + use case</h2>
+      </div>
+      <div class="right">
+        <span class="chip clay">Synthetic founder</span>
+        <span class="chip">Stage · Series A</span>
+      </div>
+    </div>
+    <p class="sub">Brought in by the Account Executive after Kitepath asked for "an agent that answers support tickets."</p>
+
+    <div class="founder">
+      <div class="avatar">MC</div>
+      <div class="founder-info">
+        <div class="name">Maya Chen <span class="tag">SYNTHETIC</span></div>
+        <div class="role">Founding engineer · Kitepath (field service scheduling for mid-market contractors, 40 customers)</div>
+      </div>
+    </div>
+
+    <div class="goal-box">
+      <div class="goal-label">Agent goal</div>
+      <div class="goal">First useful agent: triage inbound support tickets and <b>draft replies with the fix</b>. A human approves before anything sends. Auto-reply for low-risk tickets comes later, behind its own eval.</div>
+    </div>
+
+    <div class="chip-row">
+      <span class="chip">Constraints · draft-only week 1</span>
+      <span class="chip">No customer PII in prompts</span>
+      <span class="chip">Budget · $50 / mo</span>
+    </div>
+  </div>
+
+  <!-- 2 · ARCHITECTURE -->
+  <div class="card">
+    <div class="section-head">
+      <div>
+        <div class="kicker">2 · Architecture packet</div>
+        <h2>Build on Claude</h2>
+      </div>
+      <div class="right"><span class="chip sage">Ready for review</span></div>
+    </div>
+
+    <div class="arch-reco">
+      <b>Recommendation:</b> Claude Developer Platform with the <b>Messages API + tool use loop</b>, <b>prompt caching</b> on the system prompt and tools, and <b>context engineering</b> to keep every turn small. Draft-only replies with a human gate for week 1.
+    </div>
+
+    <div class="code-strip">
+      <div class="code-head">
+        <span>Illustrative snippet · no live calls</span>
+        <span class="mono">/v1/messages</span>
+      </div>
+      <pre><span class="c"># Kitepath support triage · shape follows the Messages API docs [1]</span>
+<span class="k">POST</span> /v1/messages
+{
+  <span class="s">"model"</span>: <span class="s">"claude-sonnet-4-5"</span>,
+  <span class="s">"max_tokens"</span>: 1024,
+  <span class="s">"system"</span>: [{ <span class="s">"type"</span>: <span class="s">"text"</span>, <span class="s">"text"</span>: SYSTEM_PROMPT,
+               <span class="s">"cache_control"</span>: { <span class="s">"type"</span>: <span class="s">"ephemeral"</span> } }],
+  <span class="s">"tools"</span>: [{ <span class="s">"name"</span>: <span class="s">"search_tickets"</span>,
+              <span class="s">"description"</span>: <span class="s">"Read-only search over support tickets"</span>,
+              <span class="s">"input_schema"</span>: { <span class="s">"type"</span>: <span class="s">"object"</span> } }],
+  <span class="s">"messages"</span>: [{ <span class="s">"role"</span>: <span class="s">"user"</span>, <span class="s">"content"</span>: ticket_text }]
+}</pre>
+    </div>
+
+    <div class="arch-list">
+      <div class="arch-item">
+        <div class="n">1</div>
+        <div class="body">
+          <div class="t">Messages API + <span class="mono">tool use</span> loop</div>
+          <div class="d">One tool to start: <span class="mono">search_tickets</span>. The model calls the tool, we run it, the loop continues until the draft is ready. Keep the tool set small; every extra tool is a new failure mode.<span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/api/messages" target="_blank" rel="noopener">1</a><a class="cite" href="https://platform.claude.com/docs/en/tool-use" target="_blank" rel="noopener">2</a></span></div>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="n">2</div>
+        <div class="body">
+          <div class="t">Prompt caching</div>
+          <div class="d">Cache the system prompt and tool definitions with <span class="mono">cache_control: ephemeral</span>. Repeated tool-call turns skip re-processing the same prefix, which cuts cost and latency on multi-turn tickets.<span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">3</a></span></div>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="n">3</div>
+        <div class="body">
+          <div class="t">Context engineering</div>
+          <div class="d">Compact ticket context: subject + last 3 messages, not the full thread. Pull KB articles by retrieval so the prompt stays small and the model answers from the right source.<span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/build-with-claude/tool-use" target="_blank" rel="noopener">2</a></span></div>
+        </div>
+      </div>
+      <div class="arch-item">
+        <div class="n">4</div>
+        <div class="body">
+          <div class="t">Human gate before deploy</div>
+          <div class="d">Draft-only mode for week 1: every reply is approved by a human before it sends. Auto-reply ships later, only after its own eval set passes.<span class="cites"><a class="cite" href="https://www.anthropic.com/engineering/advanced-tool-use" target="_blank" rel="noopener">5</a></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 + 4 · CHECKLIST + EVAL -->
+  <div class="pair">
+
+    <div class="card">
+      <div class="section-head">
+        <div>
+          <div class="kicker">3 · First deploy</div>
+          <h2>Deploy checklist</h2>
+        </div>
+        <div class="right"><span class="pill" id="checkPill"><span class="dot"></span><span id="checkPillText">2 open</span></span></div>
+      </div>
+      <p class="sub">Draft-reply agent, week 1 scope.</p>
+
+      <div class="check-list" id="checkList">
+        <div class="check-item done">
+          <div class="box">✓</div>
+          <div class="txt">Scope: one tool <span class="mono">search_tickets</span><small>No second tool until the loop is stable.</small></div>
+        </div>
+        <div class="check-item done">
+          <div class="box">✓</div>
+          <div class="txt">Draft-only mode week 1<small>Human approves every reply before it sends.</small></div>
+        </div>
+        <div class="check-item done">
+          <div class="box">✓</div>
+          <div class="txt">Prompt caching on system prompt + tools<small>cache_control: ephemeral.</small></div>
+        </div>
+        <div class="check-item done">
+          <div class="box">✓</div>
+          <div class="txt">Eval set: 20 labeled support tickets<small>Synthetic tickets in Kitepath's own format.</small></div>
+        </div>
+        <div class="check-item open" id="itemPerms">
+          <div class="box"></div>
+          <div class="txt">Read-only tool permissions<span class="mono"> · no PII export</span><small>search_tickets must not write or export customer data.</small></div>
+        </div>
+        <div class="check-item open" id="itemBudget">
+          <div class="box"></div>
+          <div class="txt">Budget cap: 1,000 tokens / request<small>Cache reads count separately; alert at $50 / mo.</small></div>
+        </div>
+      </div>
+      <div class="check-status" id="checkStatus">Not ready to ship — 2 items open.</div>
+    </div>
+
+    <div class="card">
+      <div class="section-head">
+        <div>
+          <div class="kicker">4 · Use-case eval</div>
+          <h2>Technical evaluation</h2>
+        </div>
+        <div class="right"><span class="chip">draft-reply tool</span></div>
+      </div>
+      <p class="sub">Runs with the eval framework on the 20-ticket set. Synthetic results, cited to public docs.</p>
+
+      <div class="eval-set">
+        <b>Eval set:</b> 20 labeled support tickets (synthetic, Kitepath format) · pass criteria: reply quality, hallucinated-fix rate, "always include ticket link" adherence.
+      </div>
+
+      <div class="findings">
+        <div class="finding">
+          <div class="head">
+            <span class="metric">Instruction following</span>
+            <span class="pass-chip pass">PASS</span>
+            <span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/evaluate-with-claude/run-evals" target="_blank" rel="noopener">4</a><a class="cite" href="https://www.anthropic.com/engineering/advanced-tool-use" target="_blank" rel="noopener">5</a></span>
+          </div>
+          <div class="detail">Claude followed the "always include ticket link" instruction on <b>19/20</b> eval tickets; Alt model 16/20.</div>
+        </div>
+        <div class="finding">
+          <div class="head">
+            <span class="metric">Tool reliability</span>
+            <span class="pass-chip pass">PASS</span>
+            <span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/build-with-claude/tool-use" target="_blank" rel="noopener">2</a><a class="cite" href="https://www.anthropic.com/engineering/advanced-tool-use" target="_blank" rel="noopener">5</a></span>
+          </div>
+          <div class="detail">Valid tool-call JSON on <b>100%</b> of runs, zero malformed calls; Alt model 92%.</div>
+        </div>
+        <div class="finding">
+          <div class="head">
+            <span class="metric">Long-context cost</span>
+            <span class="pass-chip pass">PASS</span>
+            <span class="cites"><a class="cite" href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching" target="_blank" rel="noopener">3</a></span>
+          </div>
+          <div class="detail">Prompt caching cut repeated-turn cost <b>~4x</b> on the 20-ticket set; fits the $50 / mo budget.</div>
+        </div>
+      </div>
+
+      <div class="verdict win" id="verdict">Technical evaluation: Claude wins this use case on instruction following and tool reliability.</div>
+      <div class="honest" id="honestNote">Honest note: the auto-reply tool is not yet evaluated. It needs its own labeled set before it ships.</div>
+    </div>
+
+  </div>
+
+  <!-- 5 · HUMAN GATE -->
+  <div class="card">
+    <div class="section-head">
+      <div>
+        <div class="kicker">Human gate</div>
+        <h2>Decide the next step</h2>
+      </div>
+      <div class="right"><span class="chip clay">Architect + founder</span></div>
+    </div>
+    <p class="gate-note">The Architect and the founder pick one path. Deploy stays behind a human gate — nothing ships on its own.</p>
+
+    <div class="gates">
+      <button class="primary" id="btnShip" type="button">
+        <span>Ship first agent path<span class="g-sub">Deploy the draft-reply agent · week 1 scope</span></span>
+        <span class="g-arrow">→</span>
+      </button>
+      <button class="outline" id="btnTighten" type="button">
+        <span>Tighten tool permissions<span class="g-sub">Lock search_tickets to read-only, no PII export</span></span>
+        <span class="g-arrow">→</span>
+      </button>
+      <button class="outline" id="btnEvals" type="button">
+        <span>Need evals before deploy<span class="g-sub">Auto-reply tool has no labeled eval set</span></span>
+        <span class="g-arrow">→</span>
+      </button>
+      <button class="ghost" id="btnFeedback" type="button">
+        <span>Send Product / research feedback<span class="g-sub">One line from this session, to the field learnings loop</span></span>
+        <span class="g-arrow">→</span>
+      </button>
+    </div>
+
+    <div id="blockedPanel" hidden>
+      <div class="blocked">
+        <div class="b-title" id="blockedTitle">Not ready to ship</div>
+        <div class="b-reason" id="blockedReason"></div>
+        <ul class="b-missing" id="blockedMissing"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEEDBACK STRIP -->
+  <div class="card">
+    <div class="section-head">
+      <div>
+        <div class="kicker">Field learnings</div>
+        <h2>Product / research feedback</h2>
+      </div>
+      <div class="right"><span class="chip" id="fbChip">Not sent</span></div>
+    </div>
+    <p class="sub">One line, ready to send to the Product / research loop.</p>
+    <div class="fb-note">
+      <b>Feedback:</b> "Startup support-triage agents fail when tools return partial matches and the model has to guess. Surface per-result confidence on tool calls."
+    </div>
+    <div class="fb-status">
+      <span id="fbStatusText" class="unsent">Not sent yet — Send feedback above, or use the gate button.</span>
+    </div>
+  </div>
+
+  <div class="footer">
+    Synthetic prototype for the Applied AI Architect, Startups seat. No live Claude API calls, no accounts, no Console sign-in, no real Kitepath data. The console surface is inferred from public docs and the JD, not an observed product screen. Citations link to public Claude Developer Platform docs and the Anthropic engineering note.
+  </div>
+
+  <button class="reset" id="btnReset" type="button">Reset session</button>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var statusPill = document.getElementById("statusPill");
+  var statusText = document.getElementById("statusText");
+  var caption = document.getElementById("caption");
+  var steps = document.querySelectorAll("#steps .step-dot");
+  var checkPill = document.getElementById("checkPill");
+  var checkPillText = document.getElementById("checkPillText");
+  var checkStatus = document.getElementById("checkStatus");
+  var itemPerms = document.getElementById("itemPerms");
+  var itemBudget = document.getElementById("itemBudget");
+  var verdict = document.getElementById("verdict");
+  var honestNote = document.getElementById("honestNote");
+  var blockedPanel = document.getElementById("blockedPanel");
+  var blockedTitle = document.getElementById("blockedTitle");
+  var blockedReason = document.getElementById("blockedReason");
+  var blockedMissing = document.getElementById("blockedMissing");
+  var fbChip = document.getElementById("fbChip");
+  var fbStatusText = document.getElementById("fbStatusText");
+  var btnShip = document.getElementById("btnShip");
+  var btnTighten = document.getElementById("btnTighten");
+  var btnEvals = document.getElementById("btnEvals");
+  var btnFeedback = document.getElementById("btnFeedback");
+  var btnReset = document.getElementById("btnReset");
+
+  var VERDICT_WIN = "Technical evaluation: Claude wins this use case on instruction following and tool reliability.";
+  var VERDICT_EVAL = "Eval incomplete — the auto-reply tool has no labeled set. Draft-reply findings stand, auto-reply does not ship.";
+
+  function setStatus(cls, text) {
+    statusPill.className = "pill " + cls;
+    statusText.textContent = text;
+  }
+  function setSteps(nowIdx) {
+    for (var i = 0; i < steps.length; i++) {
+      steps[i].className = "step-dot" + (i < nowIdx ? " past" : i === nowIdx ? " now" : "");
+    }
+  }
+  function setChecklist(permsDone, budgetDone) {
+    itemPerms.className = "check-item " + (permsDone ? "done" : "open");
+    itemBudget.className = "check-item " + (budgetDone ? "done" : "open");
+    var open = (permsDone ? 0 : 1) + (budgetDone ? 0 : 1);
+    checkPillText.textContent = open === 0 ? "Complete" : open + " open";
+    checkPill.className = "pill " + (open === 0 ? "ready" : "");
+    checkStatus.textContent = open === 0
+      ? "Deploy checklist complete — human gate passed."
+      : "Not ready to ship — " + open + " items open.";
+  }
+  function block(title, reason, missing) {
+    blockedTitle.textContent = title;
+    blockedReason.textContent = reason;
+    blockedMissing.innerHTML = "";
+    missing.forEach(function (m) {
+      var li = document.createElement("li");
+      li.innerHTML = m;
+      blockedMissing.appendChild(li);
+    });
+    blockedPanel.hidden = false;
+  }
+  function unblock() {
+    blockedPanel.hidden = true;
+  }
+  function disableGates() {
+    btnShip.disabled = true;
+    btnTighten.disabled = true;
+    btnEvals.disabled = true;
+  }
+  function enableGates() {
+    btnShip.disabled = false;
+    btnTighten.disabled = false;
+    btnEvals.disabled = false;
+  }
+
+  function reset() {
+    enableGates();
+    unblock();
+    setChecklist(false, false);
+    setStatus("", "Architecture ready");
+    setSteps(1);
+    caption.innerHTML = "Discovery done. Architecture packet ready. Pick a gate to move the first useful agent forward.";
+    verdict.className = "verdict win";
+    verdict.textContent = VERDICT_WIN;
+    honestNote.textContent = "Honest note: the auto-reply tool is not yet evaluated. It needs its own labeled set before it ships.";
+    fbChip.className = "chip";
+    fbChip.textContent = "Not sent";
+    fbStatusText.className = "unsent";
+    fbStatusText.textContent = "Not sent yet — Send feedback above, or use the gate button.";
+  }
+
+  btnShip.addEventListener("click", function () {
+    setChecklist(true, true);
+    setStatus("ready", "Ready to ship");
+    setSteps(2);
+    caption.innerHTML = "Deploy checklist complete. Technical evaluation won for the draft-reply use case. Auto-reply stays behind its own eval.";
+    verdict.className = "verdict win";
+    verdict.textContent = VERDICT_WIN;
+    honestNote.textContent = "Honest note: the auto-reply tool is not yet evaluated. It needs its own labeled set before it ships.";
+    disableGates();
+    unblock();
+  });
+
+  btnTighten.addEventListener("click", function () {
+    setStatus("blocked", "Not ready to ship");
+    setSteps(1);
+    caption.innerHTML = "Blocked: <b>tool permissions unbounded</b>. Tighten before deploy.";
+    verdict.className = "verdict blocked";
+    verdict.textContent = "Blocked on tool permissions — draft-reply findings stand, but the tool can still write and export PII.";
+    block(
+      "Not ready to ship — tighten tool permissions",
+      "search_tickets is read-write and can export customer PII. The human gate holds until the tool is locked down.",
+      ["<span class=\"mono\">search_tickets</span> read-only scope — no writes",
+       "No PII export from tool results",
+       "Budget cap: 1,000 tokens / request + alert at $50 / mo"]
+    );
+    disableGates();
+  });
+
+  btnEvals.addEventListener("click", function () {
+    setStatus("blocked", "Not ready to ship");
+    setSteps(2);
+    caption.innerHTML = "Blocked: <b>auto-reply tool needs its own eval set</b> before it ships.";
+    verdict.className = "verdict blocked";
+    verdict.textContent = VERDICT_EVAL;
+    honestNote.textContent = "Draft-reply findings are real and pass. Auto-reply is a new tool with no labeled set — it does not ship.";
+    block(
+      "Not ready to ship — eval incomplete",
+      "The draft-reply agent passes, but the auto-reply tool has no labeled eval set. It stays behind the human gate.",
+      ["20 labeled low-risk tickets for the auto-reply tool",
+       "Pass criteria: hallucinated-fix rate &lt; 2%, reply quality bar",
+       "Human review log for week 1 approvals"]
+    );
+    disableGates();
+  });
+
+  btnFeedback.addEventListener("click", function () {
+    fbChip.className = "chip sage";
+    fbChip.textContent = "Sent";
+    fbStatusText.className = "sent";
+    fbStatusText.textContent = "Sent to Product / research · Sep 30 2026. One line logged from this session.";
+    setSteps(4);
+    caption.innerHTML = "Feedback sent to Product / research. Field learning logged: surface per-result confidence on tool calls.";
+  });
+
+  btnReset.addEventListener("click", reset);
+
+  reset();
+})();
+</script>
+</body>
+</html>
